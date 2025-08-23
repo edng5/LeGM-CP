@@ -4,21 +4,33 @@ from nba_api.stats.endpoints import playercareerstats
 from nba_api.stats.static import players
 import asyncio
 from mcp.server.fastmcp import FastMCP
+import os
+import PyPDF2
 
 mcp = FastMCP("server")
+
+@mcp.resource("resource://resources")
+def get_projected_rankings() -> str:
+    resources_dir = os.path.join(os.path.dirname(__file__), "resources")
+    content = []
+    for filename in os.listdir(resources_dir):
+        if filename.lower().endswith(".pdf"):
+            pdf_path = os.path.join(resources_dir, filename)
+            with open(pdf_path, "rb") as f:
+                reader = PyPDF2.PdfReader(f)
+                text = ""
+                for page in reader.pages:
+                    text += page.extract_text() or ""
+                content.append(f"--- {filename} ---\n{text}\n")
+    return "\n".join(content)
 
 @mcp.tool()
 async def fetch_player_stats(player_name: str) -> dict:
     return await fetch_nba_player_stats(player_name)
 
-# @mcp.tool()
-# async def select_team(players: list, build_strategy: str) -> list:
-#     return select_team_based_on_build(players, build_strategy)
-
 @mcp.tool()
-async def league_rules() -> str:
-    return get_league_rules_prompt()
-
+async def draft_strategy() -> str:
+    return get_draft_strategy_prompt()
 
 
 CATEGORIES = ["G", "FG%", "3P", "FT%", "TRB", "AST", "STL", "BLK", "TOV", "PTS"]
@@ -65,14 +77,15 @@ async def fetch_nba_player_stats(player_name):
     return await loop.run_in_executor(None, _fetch_stats)
 
 @mcp.prompt()
-def get_league_rules_prompt() -> str:
-    with open("prompts/league_rules.txt", "r", encoding="utf-8") as f:
-        return f.read()
-
-@mcp.prompt()
 def get_draft_strategy_prompt() -> str:
+    output = ""
     with open("prompts/MMP_team_building.txt", "r", encoding="utf-8") as f:
-        return f.read()
+        output += f.read() + "\n"
+    
+    with open("prompts/league_rules.txt", "r", encoding="utf-8") as f:
+        output += f.read()
+
+    return output
 
 
 if __name__ == "__main__":
