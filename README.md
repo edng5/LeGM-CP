@@ -37,16 +37,7 @@ LeGM-CP
 
 ## Usage Examples
 - **Fetch Player Stats**: Use the `fetch_nba_player_stats` function to retrieve statistics for a specific NBA player.
-- **Select Team**: Utilize the `select_team_based_on_build` function to choose players that fit a particular strategy, such as "punt free throw."
 - **League Rules**: Access the `get_league_rules_prompt` function to obtain a template that outlines the league rules.
-
-## Tools and Functionalities
-- **fetch_player_stats.py**: Fetches player statistics from the BallDon'tLie API.
-- **select_team.py**: Implements logic to select players based on defined strategies for fantasy basketball.
-- **prompt_templates.py**: Provides templates for league rules to assist in player selection and strategy formulation.
-
-## Contributing
-Contributions are welcome! Please submit a pull request or open an issue for any enhancements or bug fixes.
 
 ## License
 This project is licensed under the MIT License. See the LICENSE file for more details.
