@@ -1,21 +1,22 @@
-# Fantasy Basketball MCP
+
+# LeGM-CP: Fantasy Basketball MCP
 
 ## Overview
-Fantasy Basketball MCP is a project designed to assist users in managing their fantasy basketball teams. It provides tools to fetch player statistics, select players based on specific build strategies, and define league rules.
+LeGM-CP is a Fantasy Basketball Management Copilot Project (MCP) that helps users manage their fantasy basketball teams. It provides tools to fetch player statistics, access league rules, and retrieve resources such as PDF cheat sheets. The chatbot client now supports conversation context retention for more natural, multi-turn interactions.
 
 ## Project Structure
 ```
-LeGM-CP
-├── src
-│   ├── server.py                # Main entry point of the application
-│   ├── tools
-│   │   ├── fetch_player_stats.py # Tool to fetch NBA player statistics
-│   │   ├── select_team.py        # Tool to select players based on build strategies
-│   │   └── prompt_templates.py    # Tool to define league rules prompt templates
-│   └── types
-│       └── index.py              # Type definitions and interfaces
-├── requirements.txt              # Project dependencies
-└── README.md                     # Project documentation
+LeGM-CP/
+├── client.py                # Chatbot client with context retention
+├── server.py                # MCP server exposing tools and resources
+├── requirements.txt         # Project dependencies
+├── pyproject.toml           # Project metadata
+├── prompts/                 # Prompt templates for league rules and strategies
+│   ├── league_rules.txt
+│   └── MMP_team_building.txt
+├── resources/               # PDF and other resource files
+│   └── FBA24catCS.pdf
+└── README.md                # Project documentation
 ```
 
 ## Setup Instructions
@@ -30,14 +31,25 @@ LeGM-CP
    pip install -r requirements.txt
    ```
 
-3. Run the server:
+3. Run the MCP server:
    ```
-   python src/server.py
+   uv run server.py
    ```
 
+4. Run the chatbot client:
+   ```
+   uv run client.py
+   ```
+
+## Features
+- **Contextual Chatbot**: The chatbot client now remembers previous conversation turns within a session, allowing for more natural and contextual interactions.
+- **Fetch Player Stats**: Use the `fetch_nba_player_stats` tool to retrieve statistics for a specific NBA player.
+- **League Rules & Draft Strategy**: Access prompt templates for league rules and team-building strategies.
+- **PDF Resource Extraction**: The server exposes a tool to extract and return the text from all PDF files in the `resources/` directory.
+
 ## Usage Examples
-- **Fetch Player Stats**: Use the `fetch_nba_player_stats` function to retrieve statistics for a specific NBA player.
-- **League Rules**: Access the `get_league_rules_prompt` function to obtain a template that outlines the league rules.
+- **Chatbot**: Start the client and interact with the chatbot. It will remember your previous questions and answers during the session.
+- **PDF Resource Tool**: The server's `get_projected_rankings` tool will extract and return the text from all PDFs in the `resources/` folder.
 
 ## License
 This project is licensed under the MIT License. See the LICENSE file for more details.
