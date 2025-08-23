@@ -1,0 +1,5 @@
+FastMCP
+httpx
+nba_api
+anthropic
+nest_asyncio

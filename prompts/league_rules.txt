@@ -1,0 +1,26 @@
+Fantasy Basketball League Rules:
+
+    1. Team Composition:
+       - Each team must consist of 13 players.
+       - A maximum of 4 centers on a team.
+       - Generally, want a good mix of all positions on a team.
+
+    2. Scoring System:
+       - 9 Categories: FG%, FT%, 3P, TRB, AST, STL, BLK, TOV, and PTS
+       - 1 week long matches
+       - accumulate the highest in majority of the categories (except TOV) to win the week.
+       - There are draws when you tie a category. 
+
+    3. Draft Rules:
+       - The draft will be a snake format.
+       - I have the 5th pick.
+
+    4. Trade Rules:
+       - Trades can be proposed and must be accepted by both teams.
+       - Trades will be reviewed by the league commissioner for fairness.
+
+    5. Playoff Format:
+       - The top 6 teams will qualify for the playoffs.
+       - The playoffs will be a single-elimination format.
+
+    Use these rules to guide your player selection and team strategy.
