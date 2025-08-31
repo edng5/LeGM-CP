@@ -11,6 +11,8 @@ dependencies = [
     "mcp[cli]>=1.12.3",
     "nba-api>=1.10.0",
     "nest-asyncio>=1.6.0",
+    "pdf2image>=1.17.0",
     "pypdf2>=3.0.1",
+    "pytesseract>=0.3.13",
     "python-dotenv>=1.1.1",
 ]

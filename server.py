@@ -5,7 +5,7 @@ from nba_api.stats.static import players
 import asyncio
 from mcp.server.fastmcp import FastMCP
 import os
-import PyPDF2
+from process_utils.utils_pdf import extract_pdf_text_with_ocr
 
 mcp = FastMCP("server")
 
@@ -16,12 +16,9 @@ def get_projected_rankings() -> str:
     for filename in os.listdir(resources_dir):
         if filename.lower().endswith(".pdf"):
             pdf_path = os.path.join(resources_dir, filename)
-            with open(pdf_path, "rb") as f:
-                reader = PyPDF2.PdfReader(f)
-                text = ""
-                for page in reader.pages:
-                    text += page.extract_text() or ""
-                content.append(f"--- {filename} ---\n{text}\n")
+            # Use OCR-based extraction for each PDF
+            text = extract_pdf_text_with_ocr(pdf_path)
+            content.append(f"--- {filename} ---\n{text}\n")
     return "\n".join(content)
 
 @mcp.tool()

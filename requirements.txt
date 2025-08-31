@@ -4,3 +4,4 @@ nba_api
 anthropic
 nest_asyncio
 pypdf2
+Pillow
