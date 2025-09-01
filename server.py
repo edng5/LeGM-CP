@@ -1,3 +1,132 @@
+
+from mcp import ClientSession, StdioServerParameters
+from mcp.client.stdio import stdio_client
+import nest_asyncio
+import logging
+from dotenv import load_dotenv
+nest_asyncio.apply()
+logging.basicConfig(level=logging.INFO)
+
+load_dotenv()
+# --- MCP ChatBot Integration ---
+class MCP_ChatBot:
+    def __init__(self):
+        self.session = None
+        self.available_tools = []
+        self.conversation_history = []
+
+    async def connect(self):
+        server_params = StdioServerParameters(
+            command="uv",
+            args=["run", "server.py"],
+            env=None,
+        )
+        self.stdio_client = stdio_client(server_params)
+        self._client_context = await self.stdio_client.__aenter__()
+        read, write = self._client_context
+        self.session = await ClientSession(read, write).__aenter__()
+        await self.session.initialize()
+        response = await self.session.list_tools()
+        tools = response.tools
+        print("\nConnected to server with tools:", [tool.name for tool in tools])
+        self.available_tools = [
+            {
+                "name": tool.name,
+                "description": tool.description,
+                "input_schema": tool.inputSchema
+            }
+            for tool in response.tools
+        ]
+
+    async def process_query(self, query):
+        import logging
+        logging.info(f"[MCP_ChatBot] Received query: {query}")
+        self.conversation_history.append({'role': 'user', 'content': query})
+        try:
+            from anthropic import Anthropic
+            mcp_context = []
+            # Pull from MCP-defined resources
+            try:
+                rankings = get_projected_rankings()
+                mcp_context.append(f"Resources:\n{rankings}")
+            except Exception as e:
+                mcp_context.append(f"Resources: Error fetching: {str(e)}")
+            # Pull from MCP-defined prompts
+            try:
+                draft_prompt = get_draft_strategy_prompt()
+                mcp_context.append(f"Prompts:\n{draft_prompt}")
+            except Exception as e:
+                mcp_context.append(f"Prompts: Error fetching: {str(e)}")
+            # Pull from MCP-defined tools (example: fetch_nba_player_stats for top players)
+            # Optionally, you could call fetch_nba_player_stats for top ranked players here
+            # Build context string
+            context_str = '\n\n'.join(mcp_context)
+            # Use the context and user query directly
+            prompt = f"{context_str}\n\nUser question: {query}"
+            anthropic_client = Anthropic()
+            response = anthropic_client.messages.create(
+                max_tokens=512,
+                model='claude-3-7-sonnet-20250219',
+                messages=[{"role": "user", "content": prompt}]
+            )
+            answer = ""
+            for content in response.content:
+                if content.type == 'text':
+                    answer += content.text + "\n"
+            return answer.strip() if answer else "No answer generated."
+        except Exception as e:
+            logging.error(f"[MCP_ChatBot] Exception: {str(e)}")
+            return f"Backend error: {str(e)}"
+
+# --- End MCP ChatBot Integration ---
+
+
+from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
+import uvicorn
+from mcp.server.fastmcp import FastMCP
+import httpx
+from nba_api.stats.endpoints import playercareerstats
+from nba_api.stats.static import players
+import asyncio
+import os
+from process_utils.utils_pdf import extract_pdf_text_with_ocr
+
+mcp = FastMCP("server")
+
+# FastAPI app for HTTP endpoint
+app = FastAPI()
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+chatbot = MCP_ChatBot()
+
+@app.on_event("startup")
+async def startup_event():
+    await chatbot.connect()
+
+@app.post("/chat")
+async def chat(request: Request):
+    import logging
+    logging.info("[FastAPI] /chat endpoint called")
+    data = await request.json()
+    user_message = data.get("message", "")
+    logging.info(f"[FastAPI] Received message: {user_message}")
+    try:
+        response = await chatbot.process_query(user_message)
+        logging.info(f"[FastAPI] Response from chatbot: {response}")
+        if not response:
+            response = "No response generated."
+        return {"response": response}
+    except Exception as e:
+        logging.error(f"[FastAPI] Exception: {str(e)}")
+        return {"error": str(e)}
+
 from mcp.server.fastmcp import FastMCP
 import httpx
 from nba_api.stats.endpoints import playercareerstats
@@ -86,4 +215,8 @@ def get_draft_strategy_prompt() -> str:
 
 
 if __name__ == "__main__":
-    mcp.run(transport="stdio")
+    import sys
+    if len(sys.argv) > 1 and sys.argv[1] == "api":
+        uvicorn.run("server:app", host="0.0.0.0", port=8000, reload=True)
+    else:
+        mcp.run(transport="stdio")
