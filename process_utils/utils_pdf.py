@@ -1,6 +1,4 @@
 import PyPDF2
-from pdf2image import convert_from_path
-import pytesseract
 from PIL import Image
 
 def extract_pdf_text_with_ocr(pdf_path):
