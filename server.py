@@ -4,6 +4,8 @@ from mcp.client.stdio import stdio_client
 import nest_asyncio
 import logging
 from dotenv import load_dotenv
+from anthropic import Anthropic
+import re
 nest_asyncio.apply()
 logging.basicConfig(level=logging.INFO)
 
@@ -14,6 +16,8 @@ class MCP_ChatBot:
         self.session = None
         self.available_tools = []
         self.conversation_history = []
+        self.drafted_players = []  # Persist user's drafted players
+        self.current_pick = None   # Persist user's current pick number
 
     async def connect(self):
         server_params = StdioServerParameters(
@@ -41,9 +45,27 @@ class MCP_ChatBot:
     async def process_query(self, query):
         import logging
         logging.info(f"[MCP_ChatBot] Received query: {query}")
+        # Extract drafted players from query ("I drafted ..." or "My current roster is ...")
+        drafted_match = re.search(r'i drafted ([A-Za-z .,\'"-]+)', query.lower())
+        roster_match = re.search(r'my current roster is: ([A-Za-z .,\'"-]+)', query.lower())
+        drafted_players = []
+        if drafted_match:
+            drafted_players += [p.strip().title() for p in drafted_match.group(1).split(',')]
+        if roster_match:
+            drafted_players += [p.strip().title() for p in roster_match.group(1).split(',')]
+        # Always persist the full roster
+        if drafted_players:
+            self.drafted_players = drafted_players
+        # Extract explicit pick number from query ("pick 1", "at 1", or "I'm drafting at position ...")
+        pick_match = re.search(r'(?:pick|selection|at pick|at)\s*(\d+)', query.lower())
+        pos_round_match = re.search(r'i\'?m drafting at position (\d+) in round (\d+)', query.lower())
+        if pos_round_match:
+            self.current_pick = int(pos_round_match.group(1)) + (int(pos_round_match.group(2)) - 1) * 10
+        elif pick_match:
+            self.current_pick = int(pick_match.group(1))
+        # Add user message to conversation history
         self.conversation_history.append({'role': 'user', 'content': query})
         try:
-            from anthropic import Anthropic
             mcp_context = []
             # Pull from MCP-defined resources
             try:
@@ -57,15 +79,49 @@ class MCP_ChatBot:
                 mcp_context.append(f"Prompts:\n{draft_prompt}")
             except Exception as e:
                 mcp_context.append(f"Prompts: Error fetching: {str(e)}")
-            # Pull from MCP-defined tools (example: fetch_nba_player_stats for top players)
-            # Optionally, you could call fetch_nba_player_stats for top ranked players here
             # Build context string
             context_str = '\n\n'.join(mcp_context)
-            # Use the context and user query directly
-            prompt = f"{context_str}\n\nUser question: {query}"
+            # Ask LLM for top 3 recommendations only
+            # Try to extract pick context from user query
+            # Use persisted pick number and drafted players
+            pick_num = self.current_pick
+            # If user says "who should I pick next?", estimate next pick based on 10-team serpentine draft
+            serpentine_next_pick = None
+            if pick_num is not None:
+                prev_pick = pick_num
+                round_num = ((prev_pick - 1) // 10) + 1
+                pos_in_round = ((prev_pick - 1) % 10) + 1
+                if round_num % 2 == 1:
+                    next_pos = 10 - pos_in_round + 1
+                else:
+                    next_pos = pos_in_round
+                serpentine_next_pick = (round_num * 10) + next_pos
+            # If query asks for next pick, use serpentine_next_pick
+            if re.search(r'next pick|who should i pick next', query.lower()) and serpentine_next_pick:
+                pick_num = serpentine_next_pick
+                self.current_pick = pick_num
+            # Compose drafted players string
+            drafted_str = ', '.join(self.drafted_players) if self.drafted_players else 'None'
+            # Ensure pick_num is a number or 'unknown'
+            pick_str = str(pick_num) if isinstance(pick_num, int) else 'unknown'
+            prompt = (
+                f"{context_str}\n\nUser question: {query}\n"
+                f"Draft Pick: {pick_str}\n"
+                f"Your drafted players: {drafted_str}\n"
+                f"Please answer for a 10-team, serpentine draft. Recommend the top 3 players for this pick only.\n"
+                "Format your answer exactly as follows:\n"
+                "Draft Pick: <The draft pick I should be at>\n"
+                "Your drafted players: <player1>, <player2>, ...\n"
+                "Recommended players: <player1>, <player2>, <player3>\n\n"
+                "<Player1> (TEAM - POS):\nPros - <pros>\nCons - <cons>\n\n"
+                "<Player2> (TEAM - POS):\nPros - <pros>\nCons - <cons>\n\n"
+                "<Player3> (TEAM - POS):\nPros - <pros>\nCons - <cons>\n\n"
+                "STATS: {\"Player1\": {\"PTS\":...,\"TRB\":...,\"AST\":...,\"3P\":...,\"STL\":...,\"BLK\":...,\"FG%\":...,\"FT%\":...,\"TOV\":...}, ...}\n"
+                "Do not include any other text or advice. Make sure to include the STATS JSON block in the above format so it can be visualized."
+            )
             anthropic_client = Anthropic()
             response = anthropic_client.messages.create(
-                max_tokens=512,
+                max_tokens=700,
                 model='claude-3-7-sonnet-20250219',
                 messages=[{"role": "user", "content": prompt}]
             )
@@ -73,6 +129,11 @@ class MCP_ChatBot:
             for content in response.content:
                 if content.type == 'text':
                     answer += content.text + "\n"
+            # Do NOT prepend 'Your team so far:' anymore; rely on LLM output 'Your drafted players:'
+            answer = answer
+            # Only increment current_pick if a pick was made (i.e., user drafted a player this turn)
+            if drafted_match and self.current_pick is not None:
+                self.current_pick += 10
             return answer.strip() if answer else "No answer generated."
         except Exception as e:
             logging.error(f"[MCP_ChatBot] Exception: {str(e)}")
